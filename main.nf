@@ -354,7 +354,7 @@ workflow pipeline {
 
         process_bams(
             merged_bam,
-            assign_features_with_stringtie.out.feaure_assignmnets,
+            assign_features_with_stringtie.out.feature_assignments,
             assign_features_with_stringtie.out.annotation,
             chr_tags,
             assign_features_with_stringtie.out.read_to_transcript_map)

@@ -197,12 +197,10 @@ process combine_mapping_and_demux_tags {
     def buffer_mb = (Math.max(4096.0, mem_mb - 4096.0) / 2).toInteger()
     def buffer_size = "${buffer_mb}M"
     def threads_per_sort = Math.max(1, (int)(task.cpus / 2))
-    def tmpdir = "tmpdir"
     """
-    mkdir ${tmpdir}
-    export TMPDIR=${tmpdir}
+    mkdir tmpdir
+    export TMPDIR=tmpdir
     
-    # Function to concatenate + sort multiple TSVs by first column
     function concat_and_sort() {
         local input_dir="\$1"
         local output_file="\$2"
@@ -210,12 +208,12 @@ process combine_mapping_and_demux_tags {
         # Get header from the first file
         head -n 1 "\$(find -L \"\$input_dir\" -type f -name '*.tsv' | head -n 1)" > "\$output_file"
     
-        # Concatenate bodies and pipe directly to sort
+        # Cat and sort
         find -L "\$input_dir" -type f -name '*.tsv' | while read -r file; do
             tail -n +2 "\$file"
         done | sort \\
             --buffer-size=${buffer_size} \\
-            --temporary-directory=${tmpdir} \\
+            --temporary-directory=tmpdir \\
             --parallel=${threads_per_sort} \\
             --field-separator=\$'\\t' \\
             --key=1,1 \\
@@ -226,7 +224,7 @@ process combine_mapping_and_demux_tags {
     concat_and_sort demux_tags demux.tsv &
     concat_and_sort mapping_tags map.tsv &
     wait
-    rm -rf ${tmpdir}/*
+    rm -rf tmpdir/*
     
     # Join tags and split by chromosome
     mkdir -p chr_tags
@@ -246,25 +244,30 @@ process combine_mapping_and_demux_tags {
             }
         '
     rm -f map.tsv demux.tsv
-    
-    # Find the column number for 'CB'
-    A_FILE=\$(find chr_tags -type f -name '*.tsv' | head -n 1)
-    CB_COL=\$(head -n 1 \${A_FILE} | awk -F'\\t' '{for (i=1; i<=NF; i++) if (\$i=="CB") print i; exit}')
+
+    # Clean up filenames: remove 'stdin-' prefix from each output
+    shopt -s nullglob
+    for f in chr_tags/stdin-*.tsv; do
+        mv "\$f" "chr_tags/\${f##*/stdin-}"
+    done
+
+    CB_COL=\$(head -n 1 \$(find chr_tags -type f -name '*.tsv' | head -n 1) | \
+        awk -F'\\t' '{for (i=1; i<=NF; i++) if (\$i=="CB") print i; exit}')
     
     # Sort each per-chromosome file by CB
     for file in chr_tags/*.tsv; do
-      head -n 1 "\$file" > "\${file}.sorted"
+      head -n 1 "\$file" | zstd > "\${file}.zst"
       tail -n +2 "\$file" | sort \\
         --buffer-size=${buffer_size} \\
-        --temporary-directory=${tmpdir} \\
+        --temporary-directory=tmpdir \\
         --parallel=${task.cpus} \\
         --field-separator=\$'\\t' \\
         --key=\${CB_COL},\${CB_COL} \\
-        >> "\${file}.sorted"
-      mv "\${file}.sorted" "\$file"
+        | zstd >> "\${file}.zst"
+      rm "\${file}"
     done
     
-    rm -rf ${tmpdir}
+    rm -rf tmpdir
     """
 }
 
@@ -309,11 +312,11 @@ workflow spaceranger {
             parse_sr_bam.out.spaceranger_tags.groupTuple()
             .join(process_long_reads.out.mapping_tags.groupTuple()))
 
-        // Extract chromosome name from the tags filenames, vom
+        // Extract chromosome name from the tags filenames
         chr_tags = combine_mapping_and_demux_tags.out.chr_tags
         .transpose()
             .map {meta, tags -> 
-                def chr = tags.baseName
+                def chr = tags.name.replaceFirst(/\.tsv\.zst$/, '')
                 [meta, chr, tags]
             }
 
