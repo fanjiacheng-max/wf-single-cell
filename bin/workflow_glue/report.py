@@ -419,8 +419,8 @@ def umap_plots(results, genes_of_interest):
                         # Genes of interest overlay:
                         # If a genes-of-interest file is supplied, overlay per-gene
                         # expression on the UMAPs.
-                        if genes_of_interest:
-                            with Grid(columns=2):
+                        with Grid(columns=2):
+                            if genes_of_interest:
                                 if umap_sample.goi_status.passed:
                                     goi_tabs = Tabs()
                                     with goi_tabs.add_dropdown_menu(
@@ -432,20 +432,20 @@ def umap_plots(results, genes_of_interest):
                                 else:
                                     p(umap_sample.goi_status.msg)
 
-                                if umap_sample.snv_status:
-                                    snv_tabs = Tabs()
-                                    with snv_tabs.add_dropdown_menu(
-                                        'SNV', change_header=True
+                            if umap_sample.snv_status:
+                                snv_tabs = Tabs()
+                                with snv_tabs.add_dropdown_menu(
+                                    'SNV', change_header=True
+                                ):
+                                    for snv_name, snv_plt in umap_sample.snv_reps(
+                                        rep
                                     ):
-                                        for snv_name, snv_plt in umap_sample.snv_reps(
-                                            rep
+                                        with snv_tabs.add_dropdown_tab(
+                                            snv_name
                                         ):
-                                            with snv_tabs.add_dropdown_tab(
-                                                snv_name
-                                            ):
-                                                snv_plt()
-                                else:
-                                    p(umap_sample.snv_status.msg)
+                                            snv_plt()
+                            else:
+                                p(umap_sample.snv_status.msg)
 
 
 def saturation_plots(seq_data, gene_data, type_label):
