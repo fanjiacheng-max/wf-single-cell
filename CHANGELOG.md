@@ -4,8 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v3.3.4]
+This patch release of wf-single-cell compresses intermediate files where possible in order to reduce the size of the working directory during execution. This release also reduces the memory requirement of the cat_tags_by_chr process which was problematic for some users. The wf-single-cell workflow now also correctly handles compressed annotation files as inputs for the Visium HD subworkflow, and fixes an edge case in reporting when cell counts are very low. Users of wf-single-cell are recommended to adopt this patch release to benefit from the improvements to disk management.
 ### Added
+- Compression of some intermediate files to reduce disk space usage by the workflow.
 - Workflow overview diagram in the documentation.
 
 ### Changed
@@ -18,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `ValueError: zero-size array to reduction operation maximum which has no identity` when generating UMAPs with fewer than 4 cells.
-- Excessive memory usage by csvtk sort in the `cat_tags_by_chr` process. Now using gnu sort.
-- The visium HD workflow now accepts gzip compressed reference annotation files.
-- Processed BAMs and read summary output files, from visium HD data, now include read quality strings.
+- Excessive memory usage by csvtk sort in the `cat_tags_by_chr` process, the process now simply uses GNU sort instead.
+- The Visium HD workflow now accepts gzip compressed reference annotation files.
+- Missing read quality strings in processed BAMs and read summary output files for Visium HD data.
 
 ## [v3.3.3]
 ### Fixed

@@ -12,10 +12,10 @@ process create_matrix {
     cpus 1
     memory "12 GB"
     input:
-        tuple val(meta), val(chr), path("features.tsv"), path(read_tags, stageAs: "barcodes.tsv")
+        tuple val(meta), val(chr), path("features.tsv.zst"), path(read_tags, stageAs: "barcodes.tsv.zst")
     output:
-        tuple val(meta), val(chr), path("summary.tsv"), emit: summary
-        tuple val(meta), val(chr), path("sa_summary.tsv"), emit: sa_summary
+        tuple val(meta), val(chr), path("summary.tsv.zst"), emit: summary
+        tuple val(meta), val(chr), path("sa_summary.tsv.zst"), emit: sa_summary
         tuple val(meta), val(chr), val("gene"), path("hdfs/*gene.hdf"), emit: gene
         tuple val(meta), val(chr), val("transcript"), path("hdfs/*transcript.hdf"), emit: transcript
         tuple val(meta), val(chr), path("stats.json"), emit: stats
@@ -26,9 +26,9 @@ process create_matrix {
     mkdir -p hdfs
 
     workflow-glue create_matrix \
-        ${chr} barcodes.tsv features.tsv \
-        --tsv_out summary.tsv \
-        --sa_tags_out sa_summary.tsv \
+        ${chr} barcodes.tsv.zst features.tsv.zst \
+        --tsv_out summary.tsv.zst \
+        --sa_tags_out sa_summary.tsv.zst \
         --hdf_out hdfs \
         --stats stats.json \
         ${opt_umi_length} \
@@ -116,20 +116,25 @@ process merge_transcriptome {
 
 
 process combine_final_tag_files {
-    // Create final per-sample read summaries with information from all stages
+    // Create final per-sample read summaries with information from all stages.
+    // Leave uncomporessed as this will be for users
     label "singlecell"
     cpus 1
     memory "1 GB"
     publishDir "${params.out_dir}/${meta.alias}", mode: 'copy'
     input:
         tuple val(meta),
-              path("tags*.tsv")
+              path("tags*.tsv.zst")
     output:
         tuple val(meta),
               path("${meta.alias}.read_summary.tsv")
     script:
     """
-    awk 'FNR>1 || NR==1' *.tsv > "${meta.alias}.read_summary.tsv"
+    zstdcat *.tsv.zst | awk '
+        NR==1 { header=\$0; print; next }  # Save and print first header
+        \$0==header { next }               # Skip subsequent headers
+        { print }
+    ' > "${meta.alias}.read_summary.tsv"
     """
 }
 
@@ -163,8 +168,8 @@ process tag_bam {
         tuple val(meta),
               path('align.bam'),
               path('align.bam.bai'),
-              path('tags/tag_*.tsv'),
-              path('sa_tags/sa_tag_*.tsv')
+              path('tags/tag_*.tsv.zst'),
+              path('sa_tags/sa_tag_*.tsv.zst')
     output:
          tuple val(meta),
                path("${meta.alias}.tagged.bam"),

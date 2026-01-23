@@ -87,11 +87,11 @@ process assign_features {
               path("chr.gtf"),
               path("tr_align.bam"),
               path("stringtie.gff"),
-              path(tags, stageAs: "tags.tsv")
+              path(tags, stageAs: "tags.tsv.zst")
     output:
         tuple val(meta),
               val(chr),
-              path("feature_assigns.tsv"),
+              path("feature_assigns.tsv.zst"),
               emit: feature_assigns
         tuple val(meta),
               path("gffcompare.annotated.gtf"),
@@ -105,8 +105,8 @@ process assign_features {
         tr_align.bam \
         gffcompare.stringtie.gff.tmap \
         chr.gtf \
-        tags.tsv \
-        feature_assigns.tsv \
+        tags.tsv.zst \
+        feature_assigns.tsv.zst\
         --min_mapq ${params.gene_assigns_minqv}
     """
 }
@@ -121,7 +121,7 @@ workflow assign_features_with_stringtie {
         ref_genome_fasta
         ref_genome_idx
     main:
-         chr_gtf = split_gtf_by_chroms(ref_gtf)
+        chr_gtf = split_gtf_by_chroms(ref_gtf)
             .flatten()
             .map {fname -> tuple(fname.baseName, fname)} // [chr, gtf]
         
@@ -144,7 +144,7 @@ workflow assign_features_with_stringtie {
                 .join(chr_tags, by: [0, 1]))
 
     emit:
-        feaure_assignmnets = assign_features.out.feature_assigns
+        feature_assignments = assign_features.out.feature_assigns
         annotation = assign_features.out.annotation
         read_to_transcript_map = stringtie.out.read_tr_map
 
